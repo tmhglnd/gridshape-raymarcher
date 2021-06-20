@@ -1,5 +1,4 @@
 # Gridshape Raymarcher
-# Simplex Noise Loop
 
 #### 📟 [See more visuals and code!](http://gumroad.com/tmhglnd)
 
