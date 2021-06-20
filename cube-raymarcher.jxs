@@ -1,0 +1,189 @@
+<jittershader name="cube-shader">
+	<description>
+		Port from Unity-GLSL tutorial by the Art of Code to display raymarching within a cube
+	</description>
+	
+	<param name="modelViewProjectionMatrix" type="mat4" state="MODELVIEW_PROJECTION_MATRIX" />
+	<param name="modelViewMatrix" type="mat4" state="MODELVIEW_MATRIX" />
+	<param name="modelViewInverse" type="mat4" state="MODELVIEW_MATRIX" transform="INVERSE" />	
+	<param name="position" type="vec3" state="POSITION" /> 
+	<param name="normal" type="vec3" state="NORMAL" />
+	<param name="texcoord" type="vec2" state="TEXCOORD" />
+	<param name="color" type="vec4" state="COLOR" />
+	<param name="campos" type="vec3" state="CAMERA_POSITION" />
+
+	<language name="glsl" version="1.5">
+		<bind param="modelViewProjectionMatrix" program="vp" />
+		<bind param="modelViewMatrix" program="vp" />
+		<bind param="modelViewInverse" program="vp" />
+		<bind param="position" program="vp" />
+		<bind param="normal" program="vp" />
+		<bind param="texcoord" program="vp" />
+		<bind param="color" program="vp" />
+		<bind param="campos" program="vp" />
+
+		<include source="sdf_shape_primitives.glsl" program="fp" />	
+		<include source="sdf_compositing.glsl" program="fp" />
+		
+<program name="vp" type="vertex">
+			<![CDATA[
+// Preprocessor
+#version 330 core
+
+// ==========================================================
+// From the Art of Code Tutorial
+// https://www.youtube.com/watch?v=S8AWd66hoCo&ab_channel=TheArtofCode
+// 
+// port by Timo Hoogland
+// with help from Jaromir Mulders
+// 
+
+// Uniforms
+uniform mat4 modelViewProjectionMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat4 modelViewInverse;
+uniform vec3 campos;
+
+// Attributes
+in vec3 position;
+in vec3 normal;
+in vec2 texcoord;
+in vec4 color;
+
+// Output
+out jit_PerVertex {
+	flat vec4 color;
+	vec4 jit_Surface_position;
+	vec3 jit_Surface_normal;
+	vec2 jit_Surface_coord;
+	vec3 jit_Cam_position;
+} jit_out;
+	
+void main() {	
+	gl_Position = modelViewProjectionMatrix * vec4(position, 1.);	
+
+	// surface normals from the cube
+	jit_out.jit_Surface_normal = transpose(inverse(mat3x3(modelViewMatrix))) * normal;
+
+	// similar to v.vertex in Unity shader
+	jit_out.jit_Surface_position = vec4(position, 1);
+
+	// results in uv coordinates 0-1 per face of cube
+	jit_out.jit_Surface_coord = texcoord;
+
+	// camera position from inverse modelViewMatrix (unity_WorldToObject)
+	jit_out.jit_Cam_position = vec3(modelViewInverse * vec4(0, 0, 0, 1));
+}
+
+]]>
+</program>
+
+<program name="fp" type="fragment">
+			<![CDATA[
+#version 330 core
+
+in jit_PerVertex {
+	flat vec4 color;
+	vec4 jit_Surface_position;
+	vec3 jit_Surface_normal;
+	vec2 jit_Surface_coord;
+	vec3 jit_Cam_position;
+} jit_in;
+
+out vec4 color;
+
+# define MAX_STEPS 100
+# define MAX_DIST 100
+# define SURF_DIST 0.005
+
+float getDist(vec3 p){
+	// get the distance from point p to the scene/surface
+	// the sdf functions here are included from 
+	// sdf_compositing.glsl and sdf_shape_primitives.glsl
+
+	// Scene 1 = Frame Box + 2 smooth spheres
+	// simple sphere (distance to origin minus radius)
+	float sphere = sdfSphere(p, vec3(0, 0, 0.5), 0.5);
+	// simple sphere 
+	float sphere2 = sdfSphere(p, vec3(-1, -0.3, 0), 0.3);
+	// box frame
+	float box = sdfBoundingBox(p, vec3(1), 0.1);
+	// float scene = opSmoothUnion(sphere, torus, 0.5);
+	float scene1 = opSmoothUnion(sphere, sphere2, 0.9);
+	// scene = opSmoothUnion(sphere2, scene, 0.8);
+	scene1 = opUnion(scene1, box);
+
+	// Scene 2 = Cube with subtracted inner and outer sphere
+	float outSphere = sdfSphere(p, vec3(0), 1.4);
+	float inSphere = sdfSphere(p, vec3(0), 1.2);
+	float cube = sdfBox(p, vec3(1));
+	float scene2 = opSmoothIntersection(outSphere, cube, 0.1);
+	scene2 = opSmoothIntersection(-inSphere, scene2, 0.1);
+
+	// try replacing scene1 with scene2 here
+	return scene1;
+}
+
+
+float rayMarch(vec3 ro, vec3 rd){
+	// distance from origin that has been marched
+	float dO = 0;
+	// distance from the surface of object
+	float dS;
+	// march!
+	for (int i=0; i<MAX_STEPS; i++){
+		// raymarching position
+		// rayorigin + distance * raydirection
+		vec3 p = ro + dO * rd;
+		// get surface distance
+		dS = getDist(p);
+		// move forward by shortest distance
+		dO += dS;
+		if (dS < SURF_DIST || dO > MAX_DIST){
+			break;
+		}
+	}
+	// return the found distance
+	return dO;
+}
+
+// calculate normal for surface
+vec3 calcNormal(vec3 p){
+	vec2 e = vec2(0.001, 0);
+	vec3 n = getDist(p) - vec3(
+		getDist(p - e.xyy),
+		getDist(p - e.yxy),
+		getDist(p - e.yyx)
+	);
+	return normalize(n);
+}
+
+void main() {
+	// uv coordinates per face of cube from -1 to 1
+	vec2 uv = (jit_in.jit_Surface_coord.xy - 0.5) * vec2(1., -1.);
+	// ray origin
+	vec3 ro = jit_in.jit_Cam_position;
+	// ray direction
+	vec3 rd = normalize(jit_in.jit_Surface_position.xyz - ro);
+	// get the distance to the scene with raymarching
+	float d = rayMarch(ro, rd);
+	// color the set for the pixel after marching	
+	vec4 col = vec4(0);
+
+	vec3 light = normalize(vec3(1, 2, 3));
+
+	if (d < MAX_DIST){
+		vec3 p = ro + rd * d;
+		vec3 n = calcNormal(p);
+		col.rgb = vec3(1) * dot(light, n) * 0.5 + 0.5;
+	} else {
+		// discard all the pixels that did not hit a surface
+		discard;
+	}
+	color = col;
+}	
+
+]]>
+		</program>
+	</language>
+</jittershader>
