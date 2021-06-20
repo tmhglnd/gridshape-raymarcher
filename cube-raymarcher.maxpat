@@ -442,8 +442,8 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 45.0, 45.0, 307.0, 33.0 ],
-					"text" : "Cube Raymarcher Shader"
+					"patching_rect" : [ 45.0, 45.0, 510.0, 33.0 ],
+					"text" : "Gridshape Raymarching Shader"
 				}
 
 			}
@@ -613,7 +613,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
-					"patching_rect" : [ 201.0, 240.0, 80.0, 35.0 ]
+					"patching_rect" : [ 232.0, 244.5, 80.0, 35.0 ]
 				}
 
 			}
@@ -625,7 +625,7 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_gl_texture", "" ],
 					"patching_rect" : [ 390.0, 450.0, 323.0, 22.0 ],
-					"text" : "jit.gl.camera cb @locklook 1 @lookat 0 0 0 @position 3 2 5"
+					"text" : "jit.gl.camera cb @locklook 1 @lookat 0 0 0 @position 2 2 4"
 				}
 
 			}
@@ -660,8 +660,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 3,
 					"outlettype" : [ "jit_matrix", "bang", "" ],
-					"patching_rect" : [ 45.0, 210.0, 331.0, 22.0 ],
-					"text" : "jit.world cb @floating 1 @erase_color 0 0 0 1 @size 480 270"
+					"patching_rect" : [ 45.0, 210.0, 393.0, 22.0 ],
+					"text" : "jit.world cb @enable 1 @floating 1 @erase_color 0 0 0 1 @size 960 540"
 				}
 
 			}
